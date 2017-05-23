@@ -30,16 +30,20 @@
 enum {
 	MENU_LIGHTING = 1,
 	MENU_POLYMODE,
+	MENU_GRID,
 	MENU_TEXTURING,
 	MENU_EXIT
 };
 typedef int BOOL;
 #define TRUE 1
 #define FALSE 0
+
 static BOOL g_bLightingEnabled = TRUE;
 static BOOL g_bFillPolygons = TRUE;
-static BOOL g_bTexture = FALSE;
+static BOOL g_bTexture = TRUE;
 static BOOL g_bButton1Down = FALSE;
+BOOL g_bGrid = TRUE;
+static GLfloat g_orbit = 0.0;
 static GLfloat g_fTeapotAngle = 0.0;
 static GLfloat g_fTeapotAngle2 = 0.0;
 static GLfloat g_fViewDistance = 3 * VIEWING_DISTANCE_MIN;
@@ -50,7 +54,7 @@ glm::vec3 pos;
 static glm::vec3 g_Pos; // Current coordinates x y z
 static glm::vec2 g_Rot; // Current rotation x y
 static GLfloat g_angle = 0;								// our radius distance from our character
-static GLfloat g_ZpositionArr[10], g_XpositionArr[10];
+static GLfloat g_ZpositionArr[100], g_XpositionArr[100];
 static glm::vec2 g_lastPos;	// Last coordinates
 
 static int g_Width = 600;                          // Initial window width
@@ -65,56 +69,113 @@ static struct timeval last_idle_time;
 
 /*Procedular scene starts here*/
 void cubepositions(void) { //set the positions of the cubes
-
-	for (int i = 0;i<10;i++)
+	int sgn = 1;
+	for (int i = 0;i<100;i++)
 	{
-		g_ZpositionArr[i] = rand() % 5 + 1;
-		g_XpositionArr[i] = rand() % 5 + 1;
+		g_ZpositionArr[i] = (rand() % 15 + 1)*sgn;
+		g_XpositionArr[i] = (rand() % 15 + 1)*sgn;
+		sgn *= -1;
 	}
 }
 
 //drawing cubes
 void cube(void) {
-	for (int i = 0;i<10 - 1;i++)
+	for (int i = 0;i<100 - 1;i++)
 	{
 		glPushMatrix();
-		glTranslated(-g_XpositionArr[i + 1] * 10, 0, -g_ZpositionArr[i + 1] *
-			10); //translate the cube
+		glTranslated(-g_XpositionArr[i + 1] * 10, 0, -g_ZpositionArr[i + 1] * 10); //translate the cube
 		glutSolidCube(2); //draw the cube
 		glPopMatrix();
 	}
 }
-
+/*Grid proc*/
+void drawGrid()
+{
+	GLfloat d3[] = { 0.4, 0.2, 0.2, 1.0 };
+	glBegin(GL_LINES);
+	for (float i = -500; i <= 500; i += 5)
+	{
+		glColor4fv(d3);
+		glVertex3f(-500, 0, i);
+		glVertex3f(500, 0, i);
+		glVertex3f(i, 0, -500);
+		glVertex3f(i, 0, 500);	
+	}
+	glEnd();
+}
 /*Whole scene*/
 void RenderObjects(void)
 {
-	cube();
-	GLfloat colorBronzeDiff[4] = { 0.8, 0.6, 0.0, 1.0 };
-	GLfloat colorBronzeSpec[4] = { 1.0, 1.0, 0.4, 1.0 };
-	GLfloat colorBlue[4] = { 0.0, 0.2, 1.0, 1.0 };
-	GLfloat colorNone[4] = { 0.0, 0.0, 0.0, 0.0 };
+	/*Colors*/
+	float colorBronzeDiff[4] = { 0.8, 0.6, 0.0, 1.0 };
+	float colorBronzeSpec[4] = { 1.0, 1.0, 0.4, 1.0 };
+
+	float colorBlue[4] = { 0.0, 0.2, 1.0, 1.0 };
+	float colorRed[4] = { 1.0,0.0,0.0,1.0 };
+	float colorWhite[4] = { 1.0,1.0,1.0,1.0 };
+	float colorGreen[4] = { 0.0,0.9,0.0, 1.0 };
+	float colorNone[4] = { 0.0, 0.0, 0.0, 0.0 };
+	/*START draw*/
 	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
+	
+	if (g_bGrid)
+		drawGrid();
+	cube();
+	/*SUN*/
 	// Main object (cube) ... transform to its coordinates, and render
-	glRotatef(15, 1, 0, 0);
-	glRotatef(45, 0, 1, 0);
-	glRotatef(g_fTeapotAngle, 0, 0, 1);
-	glMaterialfv(GL_FRONT, GL_DIFFUSE, colorBlue);
-	glMaterialfv(GL_FRONT, GL_SPECULAR, colorNone);
-	glColor4fv(colorBlue);
+	glPushMatrix();
+	//glRotatef(orbit, 0, 1,0);
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, colorRed);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, colorBronzeSpec);
+	glMaterialf(GL_FRONT, GL_SHININESS, 5.0);
+	glColor4fv(colorRed);
 	glBindTexture(GL_TEXTURE_2D, TEXTURE_ID_CUBE);
-	glutSolidCube(1.0);
+	glutSolidSphere(1.0, 50, 35);
+	//glPopMatrix();
+
+	glRotatef(g_orbit, 0, 1, 0);
+	/*Earth*/
 	// Child object (teapot) ... relative transform, and render
 	glPushMatrix();
 	glTranslatef(2, 0, 0);
-	glRotatef(g_fTeapotAngle2, 1, 1, 0);
-	glMaterialfv(GL_FRONT, GL_DIFFUSE, colorBronzeDiff);
-	glMaterialfv(GL_FRONT, GL_SPECULAR, colorBronzeSpec);
+	glRotatef(g_orbit, 0, 1, 0);
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, colorGreen);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, colorWhite);
 	glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
 	glColor4fv(colorBronzeDiff);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindTexture(GL_TEXTURE_2D, 2);
 	glutSolidTeapot(0.3);
+
+	//Ring
+	glPushMatrix();
+	glRotatef(g_orbit / 2, 1, 0, 0);
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, colorWhite);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, colorWhite);
+	glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
+	glColor4fv(colorBronzeDiff);
+	glBindTexture(GL_TEXTURE_2D, 3);
+	glutSolidTorus(0.1, 0.5, 2, 40);
+
 	glPopMatrix();
+	glPopMatrix();
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(0, -2, 0);
+	glScalef(1, cos(g_orbit / 10), sin(g_orbit / 20));
+	glRotatef(g_orbit / 2, 0, -1, 1);
+	glMaterialfv(GL_FRONT, GL_DIFFUSE, colorWhite);
+	glMaterialfv(GL_FRONT, GL_SPECULAR, colorWhite);
+	glMaterialf(GL_FRONT, GL_SHININESS, 50.0);
+	glColor4fv(colorBronzeDiff);
+	glBindTexture(GL_TEXTURE_2D, 3);
+	glutSolidCube(2.0);
+
+
+
+	//glutSolidSphere(0.3,50,35); // size, slices quality
+	//glutSolidTorus(1, 2, 20, 20);
+
 	glPopMatrix();
 }
 
@@ -122,10 +183,9 @@ void display(void)
 {
 	// Clear frame buffer and depth buffer
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+	glClearColor(0.0f, 0.0f, 0.0f, 0.5f);
 	glLoadIdentity();
 	/*TODO ship model*/
-	//glTranslatef(0.0f, 0.0f, -g_cRadius);
 	glTranslatef(0.0f, 0.0f, -g_fViewDistance); // 0,0,0 if we want 1st person camera
 	glRotatef(g_Rot.x, 1.0, 0.0, 0.0);
 	glColor3f(1.0f, 1.0f, 0.0f);
@@ -137,7 +197,6 @@ void display(void)
 		
 	// Render the scene
 	RenderObjects();
-
 	// Set up the stationary light
 	glLightfv(GL_LIGHT0, GL_POSITION, g_lightPos);
 
@@ -166,7 +225,6 @@ void InitGraphics(void)
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
 	cubepositions();
-
 	/*Textures loading here*/
 
 
@@ -204,7 +262,6 @@ void MouseMotion(int x, int y)
 		if (g_fViewDistance < VIEWING_DISTANCE_MIN)
 			g_fViewDistance = VIEWING_DISTANCE_MIN;
 		glutPostRedisplay();
-		std::cout << g_fViewDistance;
 	}
 	else
 	{
@@ -227,7 +284,6 @@ void MouseMotion(int x, int y)
 		}
 		g_Rot.y += (float)diffx;
 	}	
-	std::cout << pos.x << std::endl;
 }
 void AnimateScene(void)
 {
@@ -244,6 +300,7 @@ void AnimateScene(void)
 		1.0e-6*(time_now.tv_usec - last_idle_time.tv_usec);
 #endif
 	// Animate the teapot by updating its angles
+	g_orbit += dt*25.0;
 	g_fTeapotAngle += dt * 30.0;
 	g_fTeapotAngle2 += dt * 100.0;
 	// Save time_now for next time
@@ -253,6 +310,7 @@ void AnimateScene(void)
 }
 void SelectFromMenu(int idCommand)
 {
+	
 	switch (idCommand)
 	{
 	case MENU_LIGHTING:
@@ -265,6 +323,9 @@ void SelectFromMenu(int idCommand)
 	case MENU_POLYMODE:
 		g_bFillPolygons = !g_bFillPolygons;
 		glPolygonMode(GL_FRONT_AND_BACK, g_bFillPolygons ? GL_FILL : GL_LINE);
+		break;
+	case MENU_GRID:
+		g_bGrid = !g_bGrid;
 		break;
 	case MENU_TEXTURING:
 		g_bTexture = !g_bTexture;
@@ -323,6 +384,9 @@ void Keyboard(unsigned char key, int x, int y)
 		case 'l':
 			SelectFromMenu(MENU_LIGHTING);
 			break;
+		case 'g':
+			SelectFromMenu(MENU_GRID);
+			break;
 		case 'p':
 			SelectFromMenu(MENU_POLYMODE);
 			break;
@@ -337,6 +401,7 @@ int BuildPopupMenu(void)
 	menu = glutCreateMenu(SelectFromMenu);
 	glutAddMenuEntry("Toggle lighting\tl", MENU_LIGHTING);
 	glutAddMenuEntry("Toggle polygon fill\tp", MENU_POLYMODE);
+	glutAddMenuEntry("Toggle mesh grid\tp", MENU_GRID);
 	glutAddMenuEntry("Toggle texturing\tt", MENU_TEXTURING);
 	glutAddMenuEntry("Exit demo\tEsc", MENU_EXIT);
 	return menu;
