@@ -12,7 +12,8 @@
 
 GLuint programColor;
 GLuint programTexture;
-
+GLuint programTextureProc;
+GLuint g_Texture;
 Core::Shader_Loader shaderLoader;
 
 obj::Model shipModel;
@@ -68,9 +69,27 @@ void drawObjectColor(obj::Model * model, glm::mat4 modelMatrix, glm::vec3 color)
 	glUseProgram(0);
 }
 
-void drawObjectTexture(obj::Model * model, glm::mat4 modelMatrix, glm::vec3 color)
+void drawObjectTexture(obj::Model * model, glm::mat4 modelMatrix, GLuint texture)
 {
 	GLuint program = programTexture;
+
+	glUseProgram(program);
+
+	//glUniform3f(glGetUniformLocation(program, "texture"), SetActiveTexturetexture);
+	Core::SetActiveTexture(texture, "texture", program, 0);
+	glUniform3f(glGetUniformLocation(program, "lightDir"), lightDir.x, lightDir.y, lightDir.z);
+
+	glm::mat4 transformation = perspectiveMatrix * cameraMatrix * modelMatrix;
+	glUniformMatrix4fv(glGetUniformLocation(program, "modelViewProjectionMatrix"), 1, GL_FALSE, (float*)&transformation);
+	glUniformMatrix4fv(glGetUniformLocation(program, "modelMatrix"), 1, GL_FALSE, (float*)&modelMatrix);
+
+	Core::DrawModel(model);
+
+	glUseProgram(0);
+}
+
+void drawObjectProceduralTexture(obj::Model * model, glm::mat4 modelMatrix, glm::vec3 color) {
+	GLuint program = programTextureProc;
 
 	glUseProgram(program);
 
@@ -86,6 +105,7 @@ void drawObjectTexture(obj::Model * model, glm::mat4 modelMatrix, glm::vec3 colo
 	glUseProgram(0);
 }
 
+
 void renderScene()
 {
 	// Aktualizacja macierzy widoku i rzutowania. Macierze sa przechowywane w zmiennych globalnych, bo uzywa ich funkcja drawObject.
@@ -100,9 +120,8 @@ void renderScene()
 	// Macierz statku "przyczepia" go do kamery. Warto przeanalizowac te linijke i zrozumiec jak to dziala.
 	glm::mat4 shipModelMatrix = glm::translate(cameraPos + cameraDir * 0.5f + glm::vec3(0,-0.25f,0)) * glm::rotate(-cameraAngle + glm::radians(90.0f), glm::vec3(0,1,0)) * glm::scale(glm::vec3(0.25f));
 	drawObjectColor(&shipModel, shipModelMatrix, glm::vec3(0.6f));
-
-	drawObjectTexture(&sphereModel, glm::translate(glm::vec3(2,0,2)), glm::vec3(0.8f, 0.2f, 0.3f));
-	drawObjectTexture(&sphereModel, glm::translate(glm::vec3(-2,0,-2)), glm::vec3(0.1f, 0.4f, 0.7f));
+	drawObjectTexture(&sphereModel, glm::translate(glm::vec3(2,0,2)), g_Texture);
+	drawObjectProceduralTexture(&sphereModel, glm::translate(glm::vec3(-2,0,-2)), glm::vec3(0.0,0.0,0.0));
 
 	glutSwapBuffers();
 }
@@ -112,6 +131,9 @@ void init()
 	glEnable(GL_DEPTH_TEST);
 	programColor = shaderLoader.CreateProgram("shaders/shader_color.vert", "shaders/shader_color.frag");
 	programTexture = shaderLoader.CreateProgram("shaders/shader_tex.vert", "shaders/shader_tex.frag");
+	programTextureProc = shaderLoader.CreateProgram("shaders/shader_proc_tex.vert", "shaders/shader_proc_tex.frag");
+	
+	g_Texture = Core::LoadTexture("textures/earth.png");
 	sphereModel = obj::loadModelFromFile("models/sphere.obj");
 	shipModel = obj::loadModelFromFile("models/spaceship.obj");
 }
